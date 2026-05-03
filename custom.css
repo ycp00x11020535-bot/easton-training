@@ -1,0 +1,235 @@
+/* ---- バッジ ---- */
+.badge-teach {
+  background: #1b4332;
+  color: #d8f3dc;
+  padding: 2px 10px;
+  border-radius: 9999px;
+}
+.badge-ok {
+  background: #d8f3dc;
+  color: #1b4332;
+  padding: 2px 10px;
+  border-radius: 9999px;
+}
+.badge-progress {
+  background: #fff3cd;
+  color: #856404;
+  padding: 2px 10px;
+  border-radius: 9999px;
+}
+.badge-none {
+  background: #e9ecef;
+  color: #6c757d;
+  padding: 2px 10px;
+  border-radius: 9999px;
+}
+
+/* ---- ボタン ---- */
+.btn-primary {
+  background: #2d6a4f;
+  color: white;
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-primary:hover {
+  background: #1b4332;
+}
+.btn-sm-primary {
+  background: #2d6a4f;
+  color: white;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+.btn-sm-primary:hover {
+  background: #1b4332;
+}
+
+/* ---- フォーム ---- */
+.form-input {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.form-input:focus {
+  border-color: #40916c;
+  box-shadow: 0 0 0 2px rgba(64, 145, 108, 0.15);
+}
+.label-text {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+/* ---- セクションカード ---- */
+.section-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 16px;
+}
+.section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+  margin-bottom: 10px;
+  letter-spacing: 0.02em;
+}
+
+/* ---- チェックボックスラベル ---- */
+.check-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #374151;
+}
+.check-input {
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  accent-color: #2d6a4f;
+  flex-shrink: 0;
+}
+
+/* ---- スコアオプション ---- */
+.score-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: white;
+  transition: background 0.15s, border-color 0.15s;
+}
+.score-option:has(input:checked) {
+  background: #f0fdf4;
+  border-color: #40916c;
+}
+
+/* ---- スコアバッジ（丸数字） ---- */
+.score-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background: #40916c;
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* ---- スキルマップテーブル ---- */
+.skill-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+.skill-th-name {
+  background: #1b4332;
+  color: white;
+  padding: 8px 12px;
+  text-align: left;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: 100px;
+}
+.skill-th-item {
+  background: #2d6a4f;
+  color: white;
+  padding: 6px 4px;
+  text-align: center;
+  min-width: 52px;
+  max-width: 60px;
+}
+.skill-item-label {
+  font-size: 10px;
+  line-height: 1.3;
+}
+.skill-td-name {
+  padding: 8px 12px;
+  font-weight: 600;
+  color: #1b4332;
+  background: #f0fdf4;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  white-space: nowrap;
+}
+.skill-td-cell {
+  padding: 4px;
+  text-align: center;
+  border-bottom: 1px solid #e5e7eb;
+}
+.skill-cell {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  margin: auto;
+}
+.skill-cell-teach {
+  background: #1b4332;
+  color: #d8f3dc;
+}
+.skill-cell-ok {
+  background: #52b788;
+  color: white;
+}
+.skill-cell-progress {
+  background: #fff3cd;
+  color: #856404;
+}
+.skill-cell-none {
+  background: #f3f4f6;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+/* ---- ローディングスピナー ---- */
+.loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #d8f3dc;
+  border-top-color: #2d6a4f;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---- モバイル対応 ---- */
+@media (max-width: 640px) {
+  .skill-th-item {
+    min-width: 40px;
+    max-width: 48px;
+  }
+  .skill-item-label {
+    font-size: 9px;
+  }
+}
