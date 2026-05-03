@@ -10,6 +10,7 @@ function parseRoute(hash) {
   if (path === '/' || path === '') return { name: 'dashboard', params: {} }
   if (path.startsWith('/skills')) return { name: 'skills', params: {} }
   if (path.startsWith('/staff/add')) return { name: 'staff-add', params: {} }
+  if (path.startsWith('/import')) return { name: 'import', params: {} }
   const staffMatch = path.match(/^\/staff\/([^/]+)$/)
   if (staffMatch) return { name: 'staff-detail', params: { id: staffMatch[1] } }
   const inputMatch = path.match(/^\/input\/([^/]+)\/([^/]+)$/)
@@ -291,6 +292,70 @@ createApp({
       staffAdding.value = false
     }
 
+    // ---- CSVインポート ----
+    const csvPreview = ref([])
+    const csvImporting = ref(false)
+    const csvImportDone = ref(0)
+    const csvError = ref('')
+
+    function parseCsv(text) {
+      const lines = text.split('\n').filter(l => l.trim())
+      const rows = []
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',')
+        const name = (cols[10] || '').trim()
+        const role = (cols[23] || '').trim() || 'スタッフ'
+        const startDate = (cols[21] || '').trim().replace(/\//g, '-')
+        const leaveDate = (cols[22] || '').trim()
+        const retireDate = (cols[26] || '').trim()
+        if (!name) continue
+        if (name.includes('Timee') || name.includes('タイミー')) continue
+        if (leaveDate || retireDate) continue
+        rows.push({ name, role, startDate, selected: true })
+      }
+      return rows
+    }
+
+    function onCsvFile(event) {
+      const file = event.target.files[0]
+      if (!file) return
+      csvError.value = ''
+      csvPreview.value = []
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        try {
+          const decoder = new TextDecoder('shift-jis')
+          const text = decoder.decode(e.target.result)
+          const rows = parseCsv(text)
+          if (rows.length === 0) { csvError.value = '取り込めるスタッフが見つかりませんでした。'; return }
+          csvPreview.value = rows
+        } catch(err) {
+          csvError.value = 'CSVの読み込みに失敗しました: ' + err.message
+        }
+      }
+      reader.readAsArrayBuffer(file)
+    }
+
+    async function importCsv() {
+      const targets = csvPreview.value.filter(r => r.selected)
+      if (targets.length === 0) return
+      csvImporting.value = true
+      csvImportDone.value = 0
+      csvError.value = ''
+      for (const s of targets) {
+        await db.collection('staff').add({
+          name: s.name,
+          role: s.role,
+          startDate: s.startDate,
+          active: true
+        })
+        csvImportDone.value++
+      }
+      csvImporting.value = false
+      csvPreview.value = []
+      navigate('#/')
+    }
+
     // ---- ルート変更時のデータ取得 ----
     watch(() => route.name, async (name) => {
       if (name === 'dashboard') await fetchDashboard()
@@ -306,6 +371,8 @@ createApp({
       inputStaff, inputItem, inputForm, inputSaving, inputSaved, scoreOptions, maxScore,
       skillStaffList, skillEvals,
       newStaffForm, staffAdding, staffAddError,
+      csvPreview, csvImporting, csvImportDone, csvError,
+      onCsvFile, importCsv,
       addStaff, submitForm, navigate,
       getStatusLabel, getStatusClass, calcMaxAllowedScore,
       EVALUATION_ITEMS
@@ -324,6 +391,7 @@ createApp({
       <nav class="flex gap-3 text-sm">
         <button @click="navigate('#/')" class="hover:underline">ダッシュボード</button>
         <button @click="navigate('#/skills')" class="hover:underline">スキルマップ</button>
+        <button @click="navigate('#/import')" class="hover:underline">CSV取込</button>
         <button @click="navigate('#/staff/add')" class="bg-white text-green-700 rounded px-3 py-1 font-bold hover:bg-green-50">＋スタッフ追加</button>
       </nav>
     </div>
@@ -604,6 +672,66 @@ createApp({
             {{ staffAdding ? '追加中...' : '追加する' }}
           </button>
         </form>
+      </div>
+    </template>
+
+    <!-- ============ CSVインポート ============ -->
+    <template v-else-if="route.name === 'import'">
+      <button @click="navigate('#/')" class="text-green-600 hover:underline text-sm mb-3 block">← 一覧に戻る</button>
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 max-w-2xl">
+        <h2 class="text-lg font-bold text-gray-800 mb-1">従業員名簿CSVから一括登録</h2>
+        <p class="text-xs text-gray-400 mb-4">タイミー・退店済みスタッフは自動で除外されます</p>
+
+        <div v-if="csvError" class="mb-3 text-red-500 text-sm">{{ csvError }}</div>
+
+        <div v-if="csvPreview.length === 0" class="section-card">
+          <label class="block cursor-pointer">
+            <p class="section-title mb-2">CSVファイルを選択</p>
+            <input type="file" accept=".csv" @change="onCsvFile" class="form-input">
+          </label>
+        </div>
+
+        <template v-else>
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-sm text-gray-600">{{ csvPreview.filter(r=>r.selected).length }}名を登録します</p>
+            <label class="text-xs text-gray-400 cursor-pointer">
+              <input type="checkbox" @change="e => csvPreview.forEach(r => r.selected = e.target.checked)" checked class="mr-1">
+              全選択
+            </label>
+          </div>
+          <div class="border border-gray-200 rounded-lg overflow-hidden mb-4">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="p-2 w-8"></th>
+                  <th class="p-2 text-left">名前</th>
+                  <th class="p-2 text-left">雇用形態</th>
+                  <th class="p-2 text-left">入店日</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, i) in csvPreview" :key="i"
+                  :class="['border-t border-gray-100', row.selected ? '' : 'opacity-40']">
+                  <td class="p-2 text-center">
+                    <input type="checkbox" v-model="row.selected">
+                  </td>
+                  <td class="p-2 font-medium">{{ row.name }}</td>
+                  <td class="p-2 text-gray-500">{{ row.role }}</td>
+                  <td class="p-2 text-gray-500">{{ row.startDate }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="flex gap-3">
+            <button @click="csvPreview = []" class="flex-1 border border-gray-300 rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50">
+              やり直す
+            </button>
+            <button @click="importCsv" :disabled="csvImporting || csvPreview.filter(r=>r.selected).length === 0"
+              class="flex-1 btn-primary py-2 disabled:opacity-50">
+              {{ csvImporting ? csvImportDone + '名登録中...' : '登録する' }}
+            </button>
+          </div>
+        </template>
       </div>
     </template>
 
