@@ -45,6 +45,15 @@ function getStatusClass(ev) {
   return 'badge-none'
 }
 
+// ---- PHASEチェック 参照タイプ ----
+function refTypeInfo(refType) {
+  if (refType === 'book')     return { icon: '📖', label: 'EB', cls: 'ref-book' }
+  if (refType === 'video')    return { icon: '🎬', label: '動画', cls: 'ref-video' }
+  if (refType === 'roleplay') return { icon: '🎭', label: 'RP', cls: 'ref-roleplay' }
+  if (refType === 'test')     return { icon: '📝', label: 'TEST', cls: 'ref-test' }
+  return { icon: '─', label: '─', cls: 'ref-none' }
+}
+
 // ---- Firestore ヘルパー ----
 async function loadStaffList() {
   const snap = await db.collection('staff').where('active', '==', true).get()
@@ -94,6 +103,21 @@ async function saveEvaluation(staffId, itemId, payload) {
     const ref = await db.collection('evaluations').add(data)
     return ref.id
   }
+}
+
+async function loadPhaseProgress(staffId) {
+  const doc = await db.collection('phaseProgress').doc(staffId).get()
+  const result = {}
+  PHASE_ITEMS.forEach(item => {
+    result[item.id] = { taught: false, learned: false, confirmed: false }
+  })
+  if (doc.exists) {
+    const data = doc.data()
+    Object.keys(data).forEach(key => {
+      if (result[key]) result[key] = { ...result[key], ...data[key] }
+    })
+  }
+  return result
 }
 
 // ============================================================
@@ -146,18 +170,71 @@ createApp({
     // ---- スタッフ詳細 ----
     const currentStaff = ref(null)
     const currentEvals = ref({})
+    const staffTab = ref('eval') // 'eval' | 'phase'
+    const phaseProgress = reactive({})
+    const expandedPhases = ref([0])
+    const phaseSaving = ref(false)
+
+    function isPhaseExpanded(phase) {
+      return expandedPhases.value.includes(phase)
+    }
+    function togglePhase(phase) {
+      const idx = expandedPhases.value.indexOf(phase)
+      if (idx >= 0) expandedPhases.value.splice(idx, 1)
+      else expandedPhases.value.push(phase)
+    }
+    function phaseConfirmedCount(phase) {
+      return PHASE_GROUPS[phase].items.filter(i => phaseProgress[i.id]?.confirmed).length
+    }
+    function phaseIsComplete(phase) {
+      const g = PHASE_GROUPS[phase]
+      return g.items.every(i => phaseProgress[i.id]?.confirmed)
+    }
 
     async function fetchStaffDetail(id) {
       loading.value = true
       error.value = ''
+      staffTab.value = 'eval'
       try {
         currentStaff.value = await loadStaff(id)
         currentEvals.value = await loadEvaluations(id)
+        // PHASEプログレスも同時読み込み
+        const pp = await loadPhaseProgress(id)
+        PHASE_ITEMS.forEach(item => {
+          phaseProgress[item.id] = pp[item.id]
+        })
+        // 最初の未完了PHASEを展開
+        expandedPhases.value = []
+        const firstIncomplete = PHASE_GROUPS.findIndex(g => !g.items.every(i => pp[i.id]?.confirmed))
+        expandedPhases.value = [firstIncomplete >= 0 ? firstIncomplete : 0]
       } catch (e) {
         error.value = 'データの読み込みに失敗しました。'
         console.error(e)
       }
       loading.value = false
+    }
+
+    async function onPhaseCheck(item, field, value) {
+      const cur = phaseProgress[item.id] || { taught: false, learned: false, confirmed: false }
+      const upd = { ...cur, [field]: value }
+      // 依存チェック: 上位チェックを外したら下位も解除
+      if (field === 'taught' && !value) { upd.learned = false; upd.confirmed = false }
+      if (field === 'learned' && !value) { upd.confirmed = false }
+      // 前提チェック: 下位を先にチェックさせない
+      if (field === 'learned' && value && !cur.taught) return
+      if (field === 'confirmed' && value && !cur.learned) return
+      phaseProgress[item.id] = upd
+      if (!currentStaff.value) return
+      try {
+        phaseSaving.value = true
+        await db.collection('phaseProgress').doc(currentStaff.value.id).set(
+          { [item.id]: upd },
+          { merge: true }
+        )
+      } catch (e) {
+        console.error('Phase save error:', e)
+      }
+      phaseSaving.value = false
     }
 
     // ---- 評価入力フォーム ----
@@ -191,12 +268,8 @@ createApp({
     })
 
     watch(() => [inputForm.bookConfirmed, inputForm.understandingConfirmed, inputForm.practicalConfirmed], () => {
-      if (inputForm.officialScore > maxScore.value) {
-        inputForm.officialScore = maxScore.value
-      }
-      if (inputForm.officialScore === 1 && !inputForm.bookConfirmed) {
-        inputForm.officialScore = 0
-      }
+      if (inputForm.officialScore > maxScore.value) inputForm.officialScore = maxScore.value
+      if (inputForm.officialScore === 1 && !inputForm.bookConfirmed) inputForm.officialScore = 0
     })
 
     async function fetchInputForm(staffId, itemId) {
@@ -311,7 +384,7 @@ createApp({
         if (!name) continue
         if (name.includes('Timee') || name.includes('タイミー')) continue
         if (leaveDate || retireDate) continue
-        rows.push({ name, role, startDate, selected: true })
+        rows.push({ name, role, startDate, position: 'ホール', selected: true })
       }
       return rows
     }
@@ -346,6 +419,7 @@ createApp({
         await db.collection('staff').add({
           name: s.name,
           role: s.role,
+          position: s.position || 'ホール',
           startDate: s.startDate,
           active: true
         })
@@ -368,6 +442,9 @@ createApp({
       route, loading, error,
       staffList, staffEvalSummaries,
       currentStaff, currentEvals,
+      staffTab, phaseProgress, expandedPhases, phaseSaving,
+      isPhaseExpanded, togglePhase, phaseConfirmedCount, phaseIsComplete,
+      onPhaseCheck,
       inputStaff, inputItem, inputForm, inputSaving, inputSaved, scoreOptions, maxScore,
       skillStaffList, skillEvals,
       newStaffForm, staffAdding, staffAddError,
@@ -375,7 +452,8 @@ createApp({
       onCsvFile, importCsv,
       addStaff, submitForm, navigate,
       getStatusLabel, getStatusClass, calcMaxAllowedScore,
-      EVALUATION_ITEMS
+      refTypeInfo,
+      EVALUATION_ITEMS, PHASE_ITEMS, PHASE_GROUPS
     }
   },
 
@@ -383,16 +461,16 @@ createApp({
 <div class="min-h-screen bg-gray-50">
 
   <!-- ヘッダー -->
-  <header class="bg-green-700 text-white shadow-md sticky top-0 z-10">
+  <header class="app-header sticky top-0 z-10">
     <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-      <button @click="navigate('#/')" class="text-lg font-bold tracking-wide hover:opacity-80">
-        🌿 イーストン トレーニング
+      <button @click="navigate('#/')" class="app-logo text-left hover:opacity-80">
+        EASTONE<span>TRAINING SYSTEM</span>
       </button>
-      <nav class="flex gap-3 text-sm">
-        <button @click="navigate('#/')" class="hover:underline">ダッシュボード</button>
-        <button @click="navigate('#/skills')" class="hover:underline">スキルマップ</button>
-        <button @click="navigate('#/import')" class="hover:underline">CSV取込</button>
-        <button @click="navigate('#/staff/add')" class="bg-white text-green-700 rounded px-3 py-1 font-bold hover:bg-green-50">＋スタッフ追加</button>
+      <nav class="flex items-center gap-3 text-sm flex-wrap justify-end">
+        <button @click="navigate('#/')" class="nav-link">ダッシュボード</button>
+        <button @click="navigate('#/skills')" class="nav-link">スキルマップ</button>
+        <button @click="navigate('#/import')" class="nav-link">CSV取込</button>
+        <button @click="navigate('#/staff/add')" class="btn-primary text-sm px-4 py-2">＋スタッフ追加</button>
       </nav>
     </div>
   </header>
@@ -419,36 +497,29 @@ createApp({
         <button @click="navigate('#/staff/add')" class="btn-primary">＋スタッフを追加する</button>
       </div>
       <div class="grid gap-4 sm:grid-cols-2">
-        <div v-for="s in staffList" :key="s.id"
-          class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition cursor-pointer"
-          @click="navigate('#/staff/' + s.id)">
+        <div v-for="s in staffList" :key="s.id" class="staff-card" @click="navigate('#/staff/' + s.id)">
           <div class="flex items-center justify-between mb-3">
             <div>
-              <p class="font-bold text-gray-800">{{ s.name }}</p>
-              <p class="text-xs text-gray-400">{{ s.role }} {{ s.startDate ? '・' + s.startDate + ' 入社' : '' }}</p>
+              <p class="font-bold text-gray-900">{{ s.name }}</p>
+              <p class="text-xs text-gray-400 mt-0.5">{{ s.role }} {{ s.startDate ? '・' + s.startDate + ' 入社' : '' }}</p>
             </div>
             <div class="text-right text-xs text-gray-500">
               <span v-if="staffEvalSummaries[s.id]">
-                基準内 <span class="text-green-600 font-bold text-base">{{ staffEvalSummaries[s.id].baseCount }}</span> /
-                教えられる <span class="text-green-800 font-bold text-base">{{ staffEvalSummaries[s.id].teachCount }}</span>
+                基準内 <span class="font-black text-base" style="color:#CC1122">{{ staffEvalSummaries[s.id].baseCount }}</span> /
+                教えられる <span class="font-black text-base" style="color:#A50E1A">{{ staffEvalSummaries[s.id].teachCount }}</span>
               </span>
             </div>
           </div>
           <div v-if="staffEvalSummaries[s.id]">
-            <!-- 進捗バー -->
-            <div class="relative h-3 bg-gray-100 rounded-full overflow-hidden">
-              <div class="absolute h-full bg-green-300 rounded-full"
-                :style="{width: (staffEvalSummaries[s.id].baseCount / staffEvalSummaries[s.id].total * 100) + '%'}">
-              </div>
-              <div class="absolute h-full bg-green-600 rounded-full"
-                :style="{width: (staffEvalSummaries[s.id].teachCount / staffEvalSummaries[s.id].total * 100) + '%'}">
-              </div>
+            <div class="progress-bar-bg mb-2">
+              <div class="progress-bar-ok" :style="{width: (staffEvalSummaries[s.id].baseCount / staffEvalSummaries[s.id].total * 100) + '%'}"></div>
+              <div class="progress-bar-teach" :style="{width: (staffEvalSummaries[s.id].teachCount / staffEvalSummaries[s.id].total * 100) + '%'}"></div>
             </div>
-            <div class="flex gap-2 mt-2 flex-wrap">
-              <span v-if="staffEvalSummaries[s.id].noneCount > 0" class="badge-none text-xs">未教示 {{ staffEvalSummaries[s.id].noneCount }}</span>
-              <span v-if="staffEvalSummaries[s.id].followCount > 0" class="badge-progress text-xs">要フォロー {{ staffEvalSummaries[s.id].followCount }}</span>
-              <span v-if="staffEvalSummaries[s.id].baseCount > 0" class="badge-ok text-xs">基準内 {{ staffEvalSummaries[s.id].baseCount }}</span>
-              <span v-if="staffEvalSummaries[s.id].teachCount > 0" class="badge-teach text-xs">教えられる {{ staffEvalSummaries[s.id].teachCount }}</span>
+            <div class="flex gap-2 flex-wrap">
+              <span v-if="staffEvalSummaries[s.id].noneCount > 0" class="badge-none">未教示 {{ staffEvalSummaries[s.id].noneCount }}</span>
+              <span v-if="staffEvalSummaries[s.id].followCount > 0" class="badge-progress">要フォロー {{ staffEvalSummaries[s.id].followCount }}</span>
+              <span v-if="staffEvalSummaries[s.id].baseCount > 0" class="badge-ok">基準内 {{ staffEvalSummaries[s.id].baseCount }}</span>
+              <span v-if="staffEvalSummaries[s.id].teachCount > 0" class="badge-teach">教えられる {{ staffEvalSummaries[s.id].teachCount }}</span>
             </div>
           </div>
         </div>
@@ -458,12 +529,28 @@ createApp({
     <!-- ============ スタッフ詳細 ============ -->
     <template v-else-if="route.name === 'staff-detail' && currentStaff">
       <div class="flex items-center gap-2 mb-1">
-        <button @click="navigate('#/')" class="text-green-600 hover:underline text-sm">← 一覧に戻る</button>
+        <button @click="navigate('#/')" class="text-gray-500 hover:underline text-sm">← 一覧に戻る</button>
+        <span v-if="phaseSaving" class="text-xs text-gray-400 ml-2">保存中...</span>
       </div>
       <h1 class="text-xl font-bold text-gray-800 mb-1">{{ currentStaff.name }}</h1>
-      <p class="text-sm text-gray-400 mb-5">{{ currentStaff.role }} {{ currentStaff.startDate ? '・' + currentStaff.startDate + ' 入社' : '' }}</p>
+      <p class="text-sm text-gray-400 mb-4">{{ currentStaff.role }} {{ currentStaff.startDate ? '・' + currentStaff.startDate + ' 入社' : '' }}</p>
 
-      <div class="space-y-3">
+      <!-- タブ切替 -->
+      <div class="flex gap-1 mb-5 border-b border-gray-200">
+        <button @click="staffTab = 'eval'"
+          :class="['px-4 py-2 text-sm font-semibold border-b-2 transition-colors',
+            staffTab === 'eval' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700']">
+          📊 イーストンブック評価（12項目）
+        </button>
+        <button @click="staffTab = 'phase'"
+          :class="['px-4 py-2 text-sm font-semibold border-b-2 transition-colors',
+            staffTab === 'phase' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700']">
+          ✅ PHASEチェック表（99項目）
+        </button>
+      </div>
+
+      <!-- ─── 評価タブ ─── -->
+      <div v-if="staffTab === 'eval'" class="space-y-3">
         <div v-for="item in EVALUATION_ITEMS" :key="item.id"
           class="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
           <div class="flex items-center justify-between">
@@ -492,9 +579,143 @@ createApp({
           <div v-if="currentEvals[item.id] && currentEvals[item.id].comment" class="mt-2 text-xs text-gray-500 bg-gray-50 rounded p-2">
             💬 {{ currentEvals[item.id].comment }}
           </div>
-          <!-- 評価基準ヒント -->
           <div v-if="currentEvals[item.id] && currentEvals[item.id].officialScore" class="mt-2 text-xs text-gray-400 italic">
             {{ item.criteria[currentEvals[item.id].officialScore] }}
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── PHASEチェックタブ ─── -->
+      <div v-if="staffTab === 'phase'">
+        <!-- 全体進捗 -->
+        <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
+          <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">全体進捗</p>
+          <div class="flex items-center gap-3">
+            <div class="flex-1">
+              <div class="progress-bar-bg">
+                <div class="progress-bar-teach" :style="{width: (PHASE_ITEMS.filter(i => phaseProgress[i.id] && phaseProgress[i.id].confirmed).length / PHASE_ITEMS.length * 100) + '%'}"></div>
+              </div>
+            </div>
+            <span class="text-sm font-bold" style="color:#CC1122">
+              {{ PHASE_ITEMS.filter(i => phaseProgress[i.id] && phaseProgress[i.id].confirmed).length }} / {{ PHASE_ITEMS.length }}
+            </span>
+            <span class="text-xs text-gray-400">できた</span>
+          </div>
+          <div class="flex gap-3 mt-3 flex-wrap">
+            <div v-for="g in PHASE_GROUPS" :key="g.phase" class="text-center">
+              <div :class="['w-8 h-8 rounded-full flex items-center justify-center text-xs font-black mx-auto mb-1',
+                phaseIsComplete(g.phase) ? 'bg-red-600 text-white' :
+                phaseConfirmedCount(g.phase) > 0 ? 'bg-red-100 text-red-600 border border-red-300' :
+                'bg-gray-100 text-gray-400']">
+                P{{ g.phase }}
+              </div>
+              <p class="text-xs text-gray-400">{{ phaseConfirmedCount(g.phase) }}/{{ g.items.length }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- PHASEアコーディオン -->
+        <div class="space-y-2">
+          <div v-for="g in PHASE_GROUPS" :key="g.phase" class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+
+            <!-- フェーズヘッダー -->
+            <button @click="togglePhase(g.phase)"
+              class="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors">
+              <div class="flex items-center gap-3">
+                <span :class="['w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0',
+                  phaseIsComplete(g.phase) ? 'bg-red-600 text-white' :
+                  phaseConfirmedCount(g.phase) > 0 ? 'bg-red-100 text-red-700 border border-red-300' :
+                  'bg-gray-100 text-gray-500']">
+                  {{ phaseIsComplete(g.phase) ? '✓' : g.phase }}
+                </span>
+                <div>
+                  <p class="font-bold text-sm text-gray-800">PHASE {{ g.phase }}  {{ g.label }}</p>
+                  <p class="text-xs text-gray-400">{{ phaseConfirmedCount(g.phase) }} / {{ g.items.length }} できた</p>
+                </div>
+              </div>
+              <span class="text-gray-400 text-lg">{{ isPhaseExpanded(g.phase) ? '▲' : '▼' }}</span>
+            </button>
+
+            <!-- フェーズ内容 -->
+            <div v-if="isPhaseExpanded(g.phase)" class="border-t border-gray-50">
+              <!-- 凡例 -->
+              <div class="px-4 py-2 bg-gray-50 flex gap-3 flex-wrap text-xs text-gray-500">
+                <span class="font-semibold">確認方法:</span>
+                <span class="ref-book px-2 py-0.5 rounded text-xs">📖 EB</span>
+                <span class="ref-video px-2 py-0.5 rounded text-xs">🎬 動画</span>
+                <span class="ref-roleplay px-2 py-0.5 rounded text-xs">🎭 RP</span>
+                <span class="ref-test px-2 py-0.5 rounded text-xs">📝 TEST</span>
+                <span class="ref-none px-2 py-0.5 rounded text-xs">─ なし</span>
+              </div>
+
+              <!-- テーブルヘッダー -->
+              <div class="px-3 py-2 grid phase-row-grid text-xs font-bold text-gray-400 uppercase tracking-wide border-b border-gray-100">
+                <span>No.</span>
+                <span>チェック項目</span>
+                <span class="text-center">確認</span>
+                <span class="text-center">教えた</span>
+                <span class="text-center">覚えた</span>
+                <span class="text-center">できた</span>
+              </div>
+
+              <!-- アイテム行 -->
+              <div v-for="item in g.items" :key="item.id"
+                :class="['px-3 py-2.5 grid phase-row-grid border-b border-gray-50 text-sm transition-colors',
+                  phaseProgress[item.id] && phaseProgress[item.id].confirmed ? 'bg-green-50' : 'hover:bg-gray-50']">
+
+                <span class="text-xs text-gray-400 font-mono">{{ item.id }}</span>
+
+                <div class="min-w-0">
+                  <p :class="['text-sm leading-snug', phaseProgress[item.id] && phaseProgress[item.id].confirmed ? 'text-gray-400 line-through' : 'text-gray-700']">
+                    {{ item.name }}
+                  </p>
+                  <p v-if="item.passCriteria && item.passCriteria !== '─'" class="text-xs text-gray-400 mt-0.5">
+                    合格基準: {{ item.passCriteria }}
+                  </p>
+                </div>
+
+                <div class="flex justify-center items-start pt-0.5">
+                  <span :class="[refTypeInfo(item.refType).cls, 'px-1.5 py-0.5 rounded text-xs font-semibold']">
+                    {{ refTypeInfo(item.refType).icon }} {{ refTypeInfo(item.refType).label }}
+                  </span>
+                </div>
+
+                <div class="flex justify-center items-start pt-1">
+                  <input type="checkbox"
+                    :checked="phaseProgress[item.id] && phaseProgress[item.id].taught"
+                    @change="onPhaseCheck(item, 'taught', $event.target.checked)"
+                    class="check-input w-5 h-5">
+                </div>
+
+                <div class="flex justify-center items-start pt-1">
+                  <input type="checkbox"
+                    :checked="phaseProgress[item.id] && phaseProgress[item.id].learned"
+                    :disabled="!(phaseProgress[item.id] && phaseProgress[item.id].taught)"
+                    @change="onPhaseCheck(item, 'learned', $event.target.checked)"
+                    :class="['check-input w-5 h-5', !(phaseProgress[item.id] && phaseProgress[item.id].taught) ? 'opacity-30' : '']">
+                </div>
+
+                <div class="flex justify-center items-start pt-1">
+                  <input type="checkbox"
+                    :checked="phaseProgress[item.id] && phaseProgress[item.id].confirmed"
+                    :disabled="!(phaseProgress[item.id] && phaseProgress[item.id].learned)"
+                    @change="onPhaseCheck(item, 'confirmed', $event.target.checked)"
+                    :class="['check-input w-5 h-5', !(phaseProgress[item.id] && phaseProgress[item.id].learned) ? 'opacity-30' : '']">
+                </div>
+              </div>
+
+              <!-- フェーズ完了確認 -->
+              <div v-if="phaseIsComplete(g.phase)"
+                class="px-4 py-3 bg-red-50 text-red-600 text-sm font-semibold flex items-center gap-2">
+                🎉 PHASE {{ g.phase }} 完了！次のフェーズへ進めます
+              </div>
+            </div>
+          </div>
+
+          <!-- PHASE 6 プレースホルダー -->
+          <div class="bg-white rounded-xl border border-dashed border-gray-200 p-4 text-center text-gray-400 text-sm">
+            <p class="font-semibold mb-1">PHASE 6 ▶ カウンター &amp; 2階</p>
+            <p class="text-xs">準備中 — 項目が確定次第追加されます</p>
           </div>
         </div>
       </div>
@@ -502,7 +723,7 @@ createApp({
 
     <!-- ============ 評価入力フォーム ============ -->
     <template v-else-if="route.name === 'input' && inputStaff && inputItem">
-      <button @click="navigate('#/staff/' + inputStaff.id)" class="text-green-600 hover:underline text-sm mb-3 block">
+      <button @click="navigate('#/staff/' + inputStaff.id)" class="text-gray-500 hover:underline text-sm mb-3 block">
         ← {{ inputStaff.name }} の評価一覧に戻る
       </button>
 
@@ -510,7 +731,7 @@ createApp({
         <div class="mb-5">
           <p class="text-xs text-gray-400 mb-1">{{ inputStaff.name }} / {{ inputStaff.role }}</p>
           <h2 class="text-lg font-bold text-gray-800">{{ inputItem.id }}. {{ inputItem.name }}</h2>
-          <p class="text-xs text-green-600 mt-1">📖 参照: {{ inputItem.bookRef }}</p>
+          <p class="text-xs mt-1" style="color:#CC1122">📖 参照: {{ inputItem.bookRef }}</p>
           <p class="text-xs text-gray-400">章: {{ inputItem.bookChapter }}</p>
         </div>
 
@@ -571,7 +792,7 @@ createApp({
             <p class="section-title">正式評価</p>
             <div class="space-y-2">
               <label v-for="opt in scoreOptions" :key="opt.value"
-                :class="['score-option', opt.disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-green-50']"
+                :class="['score-option', opt.disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer']"
                 :title="opt.disabled ? 'ブック確認・理解確認・実技確認が完了してから選択できます' : ''">
                 <input type="radio" :value="opt.value" v-model="inputForm.officialScore"
                   :disabled="opt.disabled" class="mr-2">
@@ -644,7 +865,7 @@ createApp({
 
     <!-- ============ スタッフ追加 ============ -->
     <template v-else-if="route.name === 'staff-add'">
-      <button @click="navigate('#/')" class="text-green-600 hover:underline text-sm mb-3 block">← 一覧に戻る</button>
+      <button @click="navigate('#/')" class="text-gray-500 hover:underline text-sm mb-3 block">← 一覧に戻る</button>
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 max-w-md">
         <h2 class="text-lg font-bold text-gray-800 mb-5">スタッフを追加</h2>
         <div v-if="staffAddError" class="mb-3 text-red-500 text-sm">{{ staffAddError }}</div>
@@ -677,7 +898,7 @@ createApp({
 
     <!-- ============ CSVインポート ============ -->
     <template v-else-if="route.name === 'import'">
-      <button @click="navigate('#/')" class="text-green-600 hover:underline text-sm mb-3 block">← 一覧に戻る</button>
+      <button @click="navigate('#/')" class="text-gray-500 hover:underline text-sm mb-3 block">← 一覧に戻る</button>
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 max-w-2xl">
         <h2 class="text-lg font-bold text-gray-800 mb-1">従業員名簿CSVから一括登録</h2>
         <p class="text-xs text-gray-400 mb-4">タイミー・退店済みスタッフは自動で除外されます</p>
@@ -705,6 +926,7 @@ createApp({
                 <tr>
                   <th class="p-2 w-8"></th>
                   <th class="p-2 text-left">名前</th>
+                  <th class="p-2 text-left">ポジション</th>
                   <th class="p-2 text-left">雇用形態</th>
                   <th class="p-2 text-left">入店日</th>
                 </tr>
@@ -716,8 +938,15 @@ createApp({
                     <input type="checkbox" v-model="row.selected">
                   </td>
                   <td class="p-2 font-medium">{{ row.name }}</td>
-                  <td class="p-2 text-gray-500">{{ row.role }}</td>
-                  <td class="p-2 text-gray-500">{{ row.startDate }}</td>
+                  <td class="p-2">
+                    <select v-model="row.position" class="form-input py-1 text-xs">
+                      <option value="ホール">ホール</option>
+                      <option value="キッチン">キッチン</option>
+                      <option value="ホール・キッチン兼務">兼務</option>
+                    </select>
+                  </td>
+                  <td class="p-2 text-gray-500 text-xs">{{ row.role }}</td>
+                  <td class="p-2 text-gray-500 text-xs">{{ row.startDate }}</td>
                 </tr>
               </tbody>
             </table>
