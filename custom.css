@@ -88,6 +88,43 @@ body {
   font-weight: 700;
 }
 
+/* ---- ランクバッジ（インラインstyleで色指定） ---- */
+.rank-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 800;
+  border: 1px solid currentColor;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* ---- ポジションバッジ ---- */
+.pos-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.pos-badge-hall {
+  background: #FEF2F2;
+  color: #CC1122;
+  border: 1px solid #FECACA;
+}
+.pos-badge-kitchen {
+  background: #EFF6FF;
+  color: #2563EB;
+  border: 1px solid #BFDBFE;
+}
+.pos-badge-both {
+  background: #F5F3FF;
+  color: #7C3AED;
+  border: 1px solid #DDD6FE;
+}
+
 /* ---- ボタン ---- */
 .btn-primary {
   background: var(--red-primary);
@@ -315,61 +352,17 @@ body {
   font-size: 12px;
 }
 
+/* ---- スキルマップ用 コンパクトスコアセル ---- */
+.score-cell-0 { background: #F3F4F6; color: #9CA3AF; }
+.score-cell-1 { background: #FEF3C7; color: #92400E; }
+.score-cell-2 { background: #FFE4B5; color: #B45309; }
+.score-cell-3 { background: #DCFCE7; color: #166534; }
+.score-cell-4 { background: var(--red-primary); color: #fff; }
+
 /* ---- ローディングスピナー ---- */
 .loading-spinner {
   width: 36px;
   height: 36px;
   border: 3px solid #fde8ea;
   border-top-color: var(--red-primary);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* ---- PHASEチェック表 グリッドレイアウト ---- */
-.phase-row-grid {
-  display: grid;
-  grid-template-columns: 52px 1fr 52px 44px 44px 44px;
-  gap: 6px;
-  align-items: start;
-}
-
-/* ---- 参照タイプバッジ ---- */
-.ref-book {
-  background: #F9E5E7;
-  color: #CC1122;
-  border: 1px solid #f0b8bc;
-}
-.ref-video {
-  background: #EFF6FF;
-  color: #1D4ED8;
-  border: 1px solid #BFDBFE;
-}
-.ref-roleplay {
-  background: #F5F3FF;
-  color: #7C3AED;
-  border: 1px solid #DDD6FE;
-}
-.ref-test {
-  background: #FFFBEB;
-  color: #B45309;
-  border: 1px solid #FDE68A;
-}
-.ref-none {
-  background: #F3F4F6;
-  color: #9CA3AF;
-  border: 1px solid #E5E7EB;
-}
-
-/* ---- モバイル対応 ---- */
-@media (max-width: 640px) {
-  .skill-th-item { min-width: 40px; max-width: 48px; }
-  .skill-item-label { font-size: 9px; }
-  .app-logo { font-size: 15px; }
-  .phase-row-grid {
-    grid-template-columns: 44px 1fr 44px 36px 36px 36px;
-    gap: 4px;
-  }
-}
+ 
