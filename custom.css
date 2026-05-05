@@ -365,4 +365,187 @@ body {
   height: 36px;
   border: 3px solid #fde8ea;
   border-top-color: var(--red-primary);
- 
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---- PHASEチェック表 グリッドレイアウト ---- */
+.phase-row-grid {
+  display: grid;
+  grid-template-columns: 52px 1fr 52px 44px 44px 44px;
+  gap: 6px;
+  align-items: start;
+}
+
+/* ---- 参照タイプバッジ ---- */
+.ref-book {
+  background: #F9E5E7;
+  color: #CC1122;
+  border: 1px solid #f0b8bc;
+}
+.ref-video {
+  background: #EFF6FF;
+  color: #1D4ED8;
+  border: 1px solid #BFDBFE;
+}
+.ref-roleplay {
+  background: #F5F3FF;
+  color: #7C3AED;
+  border: 1px solid #DDD6FE;
+}
+.ref-test {
+  background: #FFFBEB;
+  color: #B45309;
+  border: 1px solid #FDE68A;
+}
+.ref-none {
+  background: #F3F4F6;
+  color: #9CA3AF;
+  border: 1px solid #E5E7EB;
+}
+
+/* ============================================================
+   トラッキングシート
+   ============================================================ */
+.track-score-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid var(--gray-border);
+  background: #fff;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  color: #6B7280;
+  transition: all 0.15s;
+}
+.track-score-btn:hover {
+  border-color: var(--red-primary);
+}
+.track-score-btn.active {
+  border-width: 2px;
+  transform: scale(1.05);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+.track-score-0 {
+  background: #F3F4F6;
+  color: #9CA3AF;
+}
+.track-score-0.active {
+  border-color: #6B7280;
+}
+.track-score-1.active {
+  background: #FEF3C7;
+  color: #92400E;
+  border-color: #F59E0B;
+}
+.track-score-2.active {
+  background: #FFE4B5;
+  color: #B45309;
+  border-color: #EA580C;
+}
+.track-score-3.active {
+  background: #DCFCE7;
+  color: #166534;
+  border-color: #16A34A;
+}
+.track-score-4.active {
+  background: var(--red-primary);
+  color: #fff;
+  border-color: var(--red-dark);
+}
+
+/* ============================================================
+   キャスティングボード
+   ============================================================ */
+.casting-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .casting-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+.casting-staff-card {
+  background: #fff;
+  border: 1px solid var(--gray-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.casting-staff-card:hover {
+  border-color: var(--red-primary);
+  box-shadow: 0 2px 6px rgba(204,17,34,0.08);
+}
+
+/* ============================================================
+   モバイル下部ナビゲーション
+   ============================================================ */
+.mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: #fff;
+  border-top: 1px solid #E5E5E5;
+  z-index: 50;
+  padding: 8px 0;
+  padding-bottom: env(safe-area-inset-bottom, 8px);
+}
+.mobile-nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+  color: var(--text-sub);
+  font-size: 10px;
+  font-weight: 600;
+  gap: 2px;
+}
+.mobile-nav-btn:active {
+  color: var(--red-primary);
+}
+.mobile-nav-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+.mobile-nav-label {
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 640px) {
+  .mobile-bottom-nav { display: flex; }
+  main { padding-bottom: 80px; }
+}
+
+/* ---- モバイル対応 ---- */
+@media (max-width: 640px) {
+  .skill-th-item { min-width: 40px; max-width: 48px; }
+  .skill-item-label { font-size: 9px; }
+  .app-logo { font-size: 15px; }
+  .phase-row-grid {
+    grid-template-columns: 44px 1fr 44px 36px 36px 36px;
+    gap: 4px;
+  }
+  .track-score-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+}
