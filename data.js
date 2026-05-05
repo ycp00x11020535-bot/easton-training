@@ -226,7 +226,7 @@ const PHASE_ITEMS = [
   { id: 'P4-02', phase: 4, phaseLabel: 'ホール基本業務（ウエイター①）', category: 'メニュー説明', name: '新規のお客様バージョンのメニュー説明ができる', passCriteria: 'ロープレ合格', refType: 'roleplay' },
   { id: 'P4-03', phase: 4, phaseLabel: 'ホール基本業務（ウエイター①）', category: 'メニュー説明', name: '常連様バージョンのメニュー説明・名前呼びができる', passCriteria: 'ロープレ合格', refType: 'roleplay' },
   { id: 'P4-04', phase: 4, phaseLabel: 'ホール基本業務（ウエイター①）', category: 'メニュー説明', name: '期間限定メニューや北海道産こだわりを伝えられる', passCriteria: '─', refType: 'none' },
-  { id: 'P4-05', phase: 4, phaseLabel: 'ホール基本業務（ウエイター①）', category: 'ウェルカム', name: 'ウェルカムシャワー（お客様1人に1回以上挨拶）を徹底できる', passCriteria: '3出勤連続確認', refType: 'none' },
+  { id: 'P4-05', phase: 4, phaseLabel: 'ホール基本業務(ウエイター①)', category: 'ウェルカム', name: 'ウェルカムシャワー（お客様1人に1回以上挨拶）を徹底できる', passCriteria: '3出勤連続確認', refType: 'none' },
   { id: 'P4-06', phase: 4, phaseLabel: 'ホール基本業務（ウエイター①）', category: 'ウェルカム', name: 'ジェスチャーで「何名様ですか？」を伝えられる', passCriteria: '─', refType: 'none' },
   { id: 'P4-07', phase: 4, phaseLabel: 'ホール基本業務（ウエイター①）', category: 'オーダー', name: 'ハンディ操作でお客様と目を合わせてオーダーを取れる', passCriteria: 'ミスなく1テーブル完結', refType: 'none' },
   { id: 'P4-08', phase: 4, phaseLabel: 'ホール基本業務（ウエイター①）', category: 'オーダー', name: '常に目配りをしていてお客様に大声で呼ばれない', passCriteria: '─', refType: 'none' },
